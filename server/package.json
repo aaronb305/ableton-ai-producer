@@ -1,0 +1,21 @@
+{
+  "name": "ableton-ai-server",
+  "version": "0.1.0",
+  "description": "Backend server for Ableton AI Producer — multi-provider AI with Vercel AI SDK",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "cors": "^2.8.5",
+    "ai": "^4.1.0",
+    "@ai-sdk/anthropic": "^1.1.0",
+    "@ai-sdk/openai": "^1.1.0",
+    "zod": "^3.24.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

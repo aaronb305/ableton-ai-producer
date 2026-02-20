@@ -1,14 +1,12 @@
 {
   "name": "ableton-ai-node",
-  "version": "0.1.0",
-  "description": "Node.js backend for Ableton AI Producer M4L device",
+  "version": "0.2.0",
+  "description": "Thin bridge for Ableton AI Producer M4L device (spawns backend server)",
   "main": "index.js",
   "scripts": {
     "test": "node test.js"
   },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0"
-  },
+  "dependencies": {},
   "engines": {
     "node": ">=16.0.0"
   }

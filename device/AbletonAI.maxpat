@@ -9,7 +9,7 @@
 			"modernui" : 1
 		},
 		"classnamespace" : "box",
-		"rect" : [ 0, 0, 900, 700 ],
+		"rect" : [ 0, 0, 1100, 800 ],
 		"bglocked" : 0,
 		"openinpresentation" : 1,
 		"default_fontsize" : 12.0,
@@ -32,8 +32,8 @@
 		"enablevscroll" : 1,
 		"devicewidth" : 600,
 		"description" : "AI-powered music production assistant",
-		"digest" : "Claude-powered production assistant with chat, analysis, and sound library navigation",
-		"tags" : "AI, Claude, production, assistant, chat",
+		"digest" : "Multi-provider AI production assistant with chat, analysis, and sound library",
+		"tags" : "AI, Claude, GPT, production, assistant, chat",
 		"style" : "",
 		"subpatcher_template" : "",
 		"assistshowspatchername" : 0,
@@ -87,24 +87,13 @@
 			},
 			{
 				"box" : 				{
-					"id" : "obj-route-jweb",
-					"maxclass" : "newobj",
-					"numinlets" : 1,
-					"numoutlets" : 7,
-					"outlettype" : [ "", "", "", "", "", "", "" ],
-					"patching_rect" : [ 30.0, 120.0, 500.0, 22.0 ],
-					"text" : "route chat set_api_key set_model set_depth clear_history request_session"
-				}
-			},
-			{
-				"box" : 				{
 					"id" : "obj-route-node",
 					"maxclass" : "newobj",
 					"numinlets" : 1,
-					"numoutlets" : 6,
-					"outlettype" : [ "", "", "", "", "", "" ],
-					"patching_rect" : [ 30.0, 420.0, 480.0, 22.0 ],
-					"text" : "route chat_response chat_done chat_error action_request token_usage"
+					"numoutlets" : 2,
+					"outlettype" : [ "", "" ],
+					"patching_rect" : [ 30.0, 340.0, 200.0, 22.0 ],
+					"text" : "route action_request"
 				}
 			},
 			{
@@ -114,7 +103,7 @@
 					"numinlets" : 1,
 					"numoutlets" : 3,
 					"outlettype" : [ "", "", "" ],
-					"patching_rect" : [ 450.0, 440.0, 280.0, 22.0 ],
+					"patching_rect" : [ 450.0, 410.0, 280.0, 22.0 ],
 					"text" : "route action_result action_error"
 				}
 			},
@@ -131,78 +120,12 @@
 			},
 			{
 				"box" : 				{
-					"id" : "obj-prepend-chat",
-					"maxclass" : "newobj",
-					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"patching_rect" : [ 30.0, 170.0, 100.0, 22.0 ],
-					"text" : "prepend chat"
-				}
-			},
-			{
-				"box" : 				{
-					"id" : "obj-prepend-apikey",
-					"maxclass" : "newobj",
-					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"patching_rect" : [ 120.0, 170.0, 120.0, 22.0 ],
-					"text" : "prepend set_api_key"
-				}
-			},
-			{
-				"box" : 				{
-					"id" : "obj-prepend-model",
-					"maxclass" : "newobj",
-					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"patching_rect" : [ 250.0, 170.0, 120.0, 22.0 ],
-					"text" : "prepend set_model"
-				}
-			},
-			{
-				"box" : 				{
-					"id" : "obj-prepend-depth",
-					"maxclass" : "newobj",
-					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"text" : "prepend set_depth",
-					"patching_rect" : [ 360.0, 170.0, 120.0, 22.0 ]
-				}
-			},
-			{
-				"box" : 				{
-					"id" : "obj-clear",
-					"maxclass" : "newobj",
-					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"patching_rect" : [ 470.0, 170.0, 130.0, 22.0 ],
-					"text" : "prepend clear_history"
-				}
-			},
-			{
-				"box" : 				{
-					"id" : "obj-trigger-session",
-					"maxclass" : "newobj",
-					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "bang" ],
-					"patching_rect" : [ 530.0, 170.0, 60.0, 22.0 ],
-					"text" : "t bang"
-				}
-			},
-			{
-				"box" : 				{
 					"id" : "obj-prepend-ar",
 					"maxclass" : "newobj",
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 450.0, 480.0, 130.0, 22.0 ],
+					"patching_rect" : [ 450.0, 450.0, 130.0, 22.0 ],
 					"text" : "prepend action_result"
 				}
 			},
@@ -213,72 +136,8 @@
 					"numinlets" : 1,
 					"numoutlets" : 1,
 					"outlettype" : [ "" ],
-					"patching_rect" : [ 450.0, 510.0, 140.0, 22.0 ],
+					"patching_rect" : [ 450.0, 480.0, 140.0, 22.0 ],
 					"text" : "prepend session_state"
-				}
-			},
-			{
-				"box" : 				{
-					"id" : "obj-to-jweb-response",
-					"maxclass" : "newobj",
-					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"patching_rect" : [ 30.0, 470.0, 140.0, 22.0 ],
-					"text" : "prepend chat_response"
-				}
-			},
-			{
-				"box" : 				{
-					"id" : "obj-to-jweb-done",
-					"maxclass" : "newobj",
-					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"patching_rect" : [ 100.0, 470.0, 100.0, 22.0 ],
-					"text" : "prepend chat_done"
-				}
-			},
-			{
-				"box" : 				{
-					"id" : "obj-to-jweb-error",
-					"maxclass" : "newobj",
-					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"patching_rect" : [ 190.0, 470.0, 100.0, 22.0 ],
-					"text" : "prepend chat_error"
-				}
-			},
-			{
-				"box" : 				{
-					"id" : "obj-to-jweb-tokens",
-					"maxclass" : "newobj",
-					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
-					"patching_rect" : [ 380.0, 470.0, 120.0, 22.0 ],
-					"text" : "prepend token_usage"
-				}
-			},
-			{
-				"box" : 				{
-					"id" : "obj-comment-title",
-					"maxclass" : "comment",
-					"numinlets" : 1,
-					"numoutlets" : 0,
-					"patching_rect" : [ 30.0, 550.0, 400.0, 20.0 ],
-					"text" : "Ableton AI Producer — Message routing between jweb, node.script, and js objects"
-				}
-			},
-			{
-				"box" : 				{
-					"id" : "obj-comment-flow1",
-					"maxclass" : "comment",
-					"numinlets" : 1,
-					"numoutlets" : 0,
-					"patching_rect" : [ 30.0, 570.0, 600.0, 20.0 ],
-					"text" : "Flow: jweb (user input) → route → node.script (Claude API) → route → jweb (display) + js (Ableton actions)"
 				}
 			},
 			{
@@ -346,85 +205,159 @@
 					"patching_rect" : [ 700.0, 280.0, 70.0, 22.0 ],
 					"text" : "delay 5000"
 				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-comment-title",
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 30.0, 550.0, 600.0, 20.0 ],
+					"text" : "Ableton AI Producer — Simplified routing: jweb talks to server directly, node.script is thin bridge"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-comment-flow1",
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 30.0, 570.0, 700.0, 20.0 ],
+					"text" : "Chat flow: jweb → HTTP/SSE → server (port 9320). Action flow: server → SSE → node.script → Max → action-executor → result → node.script → server"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-comment-audio",
+					"maxclass" : "comment",
+					"numinlets" : 1,
+					"numoutlets" : 0,
+					"patching_rect" : [ 30.0, 630.0, 600.0, 20.0 ],
+					"text" : "Audio analysis: plugin~ → sigmund~/loudness~ → audio-analyzer.js → node.script → server"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-plugin",
+					"maxclass" : "newobj",
+					"numinlets" : 2,
+					"numoutlets" : 2,
+					"outlettype" : [ "signal", "signal" ],
+					"patching_rect" : [ 30.0, 640.0, 80.0, 22.0 ],
+					"text" : "plugin~ 2 2"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-sigmund",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "list" ],
+					"patching_rect" : [ 30.0, 670.0, 200.0, 22.0 ],
+					"text" : "sigmund~ @npeak 5 @minpower 40"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-loudness",
+					"maxclass" : "newobj",
+					"numinlets" : 2,
+					"numoutlets" : 3,
+					"outlettype" : [ "float", "float", "float" ],
+					"patching_rect" : [ 200.0, 670.0, 150.0, 22.0 ],
+					"text" : "loudness~ @interval 200"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-metro-analysis",
+					"maxclass" : "newobj",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "bang" ],
+					"patching_rect" : [ 400.0, 640.0, 70.0, 22.0 ],
+					"text" : "metro 500"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-audio-analyzer",
+					"maxclass" : "newobj",
+					"numinlets" : 3,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 30.0, 710.0, 240.0, 22.0 ],
+					"text" : "js ../patchers/audio-analyzer.js"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-route-analysis",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 2,
+					"outlettype" : [ "", "" ],
+					"patching_rect" : [ 30.0, 740.0, 180.0, 22.0 ],
+					"text" : "route analysis_data"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-prepend-analysis",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 30.0, 770.0, 150.0, 22.0 ],
+					"text" : "prepend audio_analysis"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-live-observer",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 3,
+					"outlettype" : [ "", "", "" ],
+					"patching_rect" : [ 400.0, 610.0, 200.0, 22.0 ],
+					"text" : "live.observer @property is_playing @type property @path live_set"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-gate-analysis",
+					"maxclass" : "newobj",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 400.0, 640.0, 40.0, 22.0 ],
+					"text" : "gate"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-pack-loudness",
+					"maxclass" : "newobj",
+					"numinlets" : 3,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 200.0, 700.0, 160.0, 22.0 ],
+					"text" : "pack 0. 0. 0."
+				}
 			}
 		],
 		"lines" : [
 			{
 				"patchline" : 				{
-					"source" : [ "obj-jweb", 0 ],
-					"destination" : [ "obj-route-jweb", 0 ]
+					"source" : [ "obj-node", 0 ],
+					"destination" : [ "obj-route-node", 0 ]
 				}
 			},
 			{
 				"patchline" : 				{
-					"source" : [ "obj-route-jweb", 0 ],
-					"destination" : [ "obj-prepend-chat", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-route-jweb", 1 ],
-					"destination" : [ "obj-prepend-apikey", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-route-jweb", 2 ],
-					"destination" : [ "obj-prepend-model", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-route-jweb", 3 ],
-					"destination" : [ "obj-prepend-depth", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-route-jweb", 4 ],
-					"destination" : [ "obj-clear", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-route-jweb", 5 ],
-					"destination" : [ "obj-trigger-session", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-prepend-chat", 0 ],
-					"destination" : [ "obj-node", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-prepend-apikey", 0 ],
-					"destination" : [ "obj-node", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-prepend-model", 0 ],
-					"destination" : [ "obj-node", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-prepend-depth", 0 ],
-					"destination" : [ "obj-node", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-clear", 0 ],
-					"destination" : [ "obj-node", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-trigger-session", 0 ],
-					"destination" : [ "obj-session-reader", 0 ]
+					"source" : [ "obj-route-node", 0 ],
+					"destination" : [ "obj-action-executor", 0 ]
 				}
 			},
 			{
@@ -443,66 +376,6 @@
 				"patchline" : 				{
 					"source" : [ "obj-prepend-session-node", 0 ],
 					"destination" : [ "obj-node", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-node", 0 ],
-					"destination" : [ "obj-route-node", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-route-node", 0 ],
-					"destination" : [ "obj-to-jweb-response", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-route-node", 1 ],
-					"destination" : [ "obj-to-jweb-done", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-route-node", 2 ],
-					"destination" : [ "obj-to-jweb-error", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-route-node", 3 ],
-					"destination" : [ "obj-action-executor", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-route-node", 4 ],
-					"destination" : [ "obj-to-jweb-tokens", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-to-jweb-response", 0 ],
-					"destination" : [ "obj-jweb", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-to-jweb-done", 0 ],
-					"destination" : [ "obj-jweb", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-to-jweb-error", 0 ],
-					"destination" : [ "obj-jweb", 0 ]
-				}
-			},
-			{
-				"patchline" : 				{
-					"source" : [ "obj-to-jweb-tokens", 0 ],
-					"destination" : [ "obj-jweb", 0 ]
 				}
 			},
 			{
@@ -562,6 +435,90 @@
 			{
 				"patchline" : 				{
 					"source" : [ "obj-prepend-library-index", 0 ],
+					"destination" : [ "obj-node", 0 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-plugin", 0 ],
+					"destination" : [ "obj-sigmund", 0 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-plugin", 0 ],
+					"destination" : [ "obj-loudness", 0 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-plugin", 1 ],
+					"destination" : [ "obj-loudness", 1 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-sigmund", 0 ],
+					"destination" : [ "obj-audio-analyzer", 0 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-loudness", 0 ],
+					"destination" : [ "obj-pack-loudness", 0 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-loudness", 1 ],
+					"destination" : [ "obj-pack-loudness", 1 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-loudness", 2 ],
+					"destination" : [ "obj-pack-loudness", 2 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-pack-loudness", 0 ],
+					"destination" : [ "obj-audio-analyzer", 1 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-live-observer", 0 ],
+					"destination" : [ "obj-gate-analysis", 0 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-gate-analysis", 0 ],
+					"destination" : [ "obj-metro-analysis", 0 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-metro-analysis", 0 ],
+					"destination" : [ "obj-audio-analyzer", 2 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-audio-analyzer", 0 ],
+					"destination" : [ "obj-route-analysis", 0 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-route-analysis", 0 ],
+					"destination" : [ "obj-prepend-analysis", 0 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-prepend-analysis", 0 ],
 					"destination" : [ "obj-node", 0 ]
 				}
 			}

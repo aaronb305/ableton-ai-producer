@@ -34,18 +34,25 @@
           id="api-key-input"
           class="settings-input"
           type="password"
-          placeholder="sk-ant-..."
+          placeholder="sk-ant-... or sk-..."
           autocomplete="off"
           spellcheck="false"
         >
       </div>
       <div class="settings-row">
         <div class="settings-group">
+          <label class="settings-label" for="provider-select">Provider</label>
+          <select id="provider-select" class="settings-select">
+            <option value="anthropic" selected>Anthropic</option>
+            <option value="openai">OpenAI</option>
+          </select>
+        </div>
+        <div class="settings-group">
           <label class="settings-label" for="model-select">Model</label>
           <select id="model-select" class="settings-select">
-            <option value="sonnet" selected>Claude Sonnet</option>
-            <option value="haiku">Claude Haiku</option>
-            <option value="opus">Claude Opus</option>
+            <option value="claude-sonnet-4-6" selected>Claude Sonnet 4.6</option>
+            <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
+            <option value="claude-opus-4-6">Claude Opus 4.6</option>
           </select>
         </div>
         <div class="settings-group">
@@ -66,8 +73,8 @@
     <!-- Tab Bar -->
     <nav class="tab-bar">
       <button class="tab active" data-tab="chat">Chat</button>
-      <button class="tab disabled" data-tab="analyze">Analyze</button>
-      <button class="tab disabled" data-tab="browse">Browse</button>
+      <button class="tab" data-tab="analyze">Analyze</button>
+      <button class="tab" data-tab="browse">Browse</button>
     </nav>
 
     <!-- Tab: Chat -->
@@ -83,7 +90,7 @@
           </div>
           <div class="empty-state-title">AI Production Assistant</div>
           <div class="empty-state-subtitle">
-            Ask about your session, get mixing advice, find sounds, or let Claude take actions in Ableton.
+            Ask about your session, get mixing advice, find sounds, or let the AI take actions in Ableton.
           </div>
         </div>
 
@@ -101,10 +108,11 @@
         <div class="input-wrapper">
           <textarea
             id="chat-input"
-            placeholder="Ask Claude about your session..."
+            placeholder="Ask about your session..."
             rows="1"
             spellcheck="true"
           ></textarea>
+          <div id="cost-estimate" class="cost-estimate" style="display:none"></div>
         </div>
         <button id="send-btn" class="send-btn" title="Send message">
           <svg viewBox="0 0 20 20" fill="currentColor">
@@ -114,19 +122,45 @@
       </div>
     </div>
 
-    <!-- Tab: Analyze (placeholder) -->
+    <!-- Tab: Analyze -->
     <div class="tab-content" data-tab="analyze">
-      <div class="placeholder-panel">
-        <div class="title">Track Analyzer</div>
-        <div class="subtitle">Coming soon. Spectral analysis, key detection, and session diagnostics.</div>
+      <div class="analyze-panel">
+        <div class="analyze-header">
+          <div class="analyze-title">Session Analyzer</div>
+          <button id="analyze-btn" class="btn btn-primary">Analyze Session</button>
+        </div>
+        <div id="analyze-content" class="analyze-content">
+          <div class="analyze-placeholder">
+            <div class="analyze-placeholder-text">
+              Click "Analyze Session" to get a detailed overview of your tracks, devices, mix balance, and suggestions for improvement.
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Tab: Browse (placeholder) -->
+    <!-- Tab: Browse -->
     <div class="tab-content" data-tab="browse">
-      <div class="placeholder-panel">
-        <div class="title">Sound Library</div>
-        <div class="subtitle">Coming soon. Browse and search Ableton's built-in instruments and presets.</div>
+      <div class="browse-panel">
+        <div class="browse-header">
+          <input
+            id="browse-input"
+            class="browse-search-input"
+            type="text"
+            placeholder="Search instruments, effects, presets..."
+            spellcheck="false"
+          >
+          <select id="browse-category" class="browse-category-select">
+            <option value="all">All</option>
+            <option value="instruments">Instruments</option>
+            <option value="sounds">Sounds</option>
+            <option value="drums">Drums</option>
+            <option value="audio_effects">Audio Effects</option>
+            <option value="midi_effects">MIDI Effects</option>
+            <option value="samples">Samples</option>
+          </select>
+        </div>
+        <div id="browse-results" class="browse-results"></div>
       </div>
     </div>
 

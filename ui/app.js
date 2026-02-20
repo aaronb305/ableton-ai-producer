@@ -1,26 +1,38 @@
 /* ==========================================================================
    Ableton AI Producer — Chat Application Logic
    Runs inside jweb (embedded Chromium) in a Max for Live device.
-   Communicates with Max via window.max object.
+
+   Communication:
+     Chat, settings, library → HTTP/SSE to backend server (localhost:9320)
+     Action display → SSE events from server
+
+   Security:
+     All text is escaped via escapeHtml() before any HTML rendering.
+     renderMarkdown/renderInline apply escapeHtml first, then convert
+     markdown tokens to HTML elements. User messages use textContent.
    ========================================================================== */
 
 (function () {
   "use strict";
 
+  var SERVER_URL = "http://localhost:9320";
+
   // ---------- State ----------
 
-  const state = {
+  var state = {
     isStreaming: false,
     currentStreamEl: null,
     currentStreamText: "",
     settingsVisible: false,
     activeTab: "chat",
     messageCount: 0,
+    abortController: null,
+    costEstimateTimer: null,
   };
 
   // ---------- DOM References ----------
 
-  const dom = {
+  var dom = {
     chatArea: null,
     chatInput: null,
     sendBtn: null,
@@ -31,10 +43,16 @@
     tabs: null,
     tabContents: null,
     apiKeyInput: null,
+    providerSelect: null,
     modelSelect: null,
     contextSelect: null,
     clearBtn: null,
     emptyState: null,
+    costEstimate: null,
+    browseInput: null,
+    browseCategorySelect: null,
+    browseResults: null,
+    analyzeBtn: null,
   };
 
   // ---------- Initialization ----------
@@ -42,7 +60,7 @@
   function init() {
     cacheDom();
     bindEvents();
-    initMax();
+    loadSettings();
     autoResizeInput();
   }
 
@@ -55,16 +73,21 @@
     dom.tokenUsage = document.getElementById("token-usage");
     dom.typingIndicator = document.getElementById("typing-indicator");
     dom.apiKeyInput = document.getElementById("api-key-input");
+    dom.providerSelect = document.getElementById("provider-select");
     dom.modelSelect = document.getElementById("model-select");
     dom.contextSelect = document.getElementById("context-select");
     dom.clearBtn = document.getElementById("clear-btn");
     dom.emptyState = document.getElementById("empty-state");
+    dom.costEstimate = document.getElementById("cost-estimate");
     dom.tabs = document.querySelectorAll(".tab");
     dom.tabContents = document.querySelectorAll(".tab-content");
+    dom.browseInput = document.getElementById("browse-input");
+    dom.browseCategorySelect = document.getElementById("browse-category");
+    dom.browseResults = document.getElementById("browse-results");
+    dom.analyzeBtn = document.getElementById("analyze-btn");
   }
 
   function bindEvents() {
-    // Send message
     dom.sendBtn.addEventListener("click", handleSend);
     dom.chatInput.addEventListener("keydown", function (e) {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -73,116 +96,321 @@
       }
     });
 
-    // Auto-resize textarea
-    dom.chatInput.addEventListener("input", autoResizeInput);
+    dom.chatInput.addEventListener("input", function () {
+      autoResizeInput();
+      debouncedCostEstimate();
+    });
 
-    // Settings toggle
     dom.settingsBtn.addEventListener("click", toggleSettings);
 
-    // Tabs
     dom.tabs.forEach(function (tab) {
       tab.addEventListener("click", function () {
-        if (tab.classList.contains("disabled")) return;
         switchTab(tab.dataset.tab);
       });
     });
 
-    // Settings controls
     dom.apiKeyInput.addEventListener("change", function () {
-      setApiKey(dom.apiKeyInput.value.trim());
+      saveSettings();
     });
 
+    if (dom.providerSelect) {
+      dom.providerSelect.addEventListener("change", function () {
+        updateModelOptions();
+        saveSettings();
+      });
+    }
+
     dom.modelSelect.addEventListener("change", function () {
-      sendToMax("set_model", dom.modelSelect.value);
+      saveSettings();
     });
 
     dom.contextSelect.addEventListener("change", function () {
-      sendToMax("set_depth", dom.contextSelect.value);
+      saveSettings();
     });
 
     dom.clearBtn.addEventListener("click", clearHistory);
-  }
 
-  // ---------- Max Communication ----------
+    if (dom.browseInput) {
+      dom.browseInput.addEventListener("input", debounce(handleBrowseSearch, 300));
+    }
+    if (dom.browseCategorySelect) {
+      dom.browseCategorySelect.addEventListener("change", handleBrowseSearch);
+    }
 
-  /**
-   * Mock for testing outside Max (when window.max is undefined).
-   * Logs all calls to console so the UI can be developed in a browser.
-   */
-  function createMaxMock() {
-    console.log("[Max Mock] window.max not found — running in standalone mode");
-    return {
-      bindInlet: function (name, callback) {
-        console.log("[Max Mock] bindInlet:", name);
-        // Store callbacks so they can be triggered from the console for testing
-        if (!window._maxCallbacks) window._maxCallbacks = {};
-        window._maxCallbacks[name] = callback;
-      },
-      outlet: function () {
-        var args = Array.prototype.slice.call(arguments);
-        console.log("[Max Mock] outlet:", args.join(", "));
-      },
-    };
-  }
-
-  function initMax() {
-    var max = window.max || createMaxMock();
-
-    // Bind incoming messages from Max
-    max.bindInlet("chat_response", function (text) {
-      handleStreamChunk(text);
-    });
-
-    max.bindInlet("chat_done", function () {
-      handleStreamDone();
-    });
-
-    max.bindInlet("chat_error", function (errorMsg) {
-      handleChatError(errorMsg);
-    });
-
-    max.bindInlet("token_usage", function (inputTokens, outputTokens, cost) {
-      updateTokenUsage(inputTokens, outputTokens, cost);
-    });
-
-    max.bindInlet("session_info", function (summary) {
-      appendMessage("system", summary);
-    });
-
-    // Store reference for sending
-    window._max = max;
-  }
-
-  function sendToMax() {
-    if (window._max) {
-      window._max.outlet.apply(window._max, arguments);
+    if (dom.analyzeBtn) {
+      dom.analyzeBtn.addEventListener("click", handleAnalyzeSession);
     }
   }
 
-  // ---------- Message Handling ----------
+  // ---------- Settings via HTTP ----------
+
+  function loadSettings() {
+    fetch(SERVER_URL + "/api/settings")
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data.provider && dom.providerSelect) {
+          dom.providerSelect.value = data.provider;
+          updateModelOptions();
+        }
+        if (data.model) dom.modelSelect.value = data.model;
+        if (data.contextDepth) dom.contextSelect.value = data.contextDepth;
+      })
+      .catch(function () {});
+  }
+
+  function saveSettings() {
+    var body = {};
+    if (dom.providerSelect) body.provider = dom.providerSelect.value;
+    if (dom.modelSelect) body.model = dom.modelSelect.value;
+    if (dom.contextSelect) body.contextDepth = dom.contextSelect.value;
+    if (dom.apiKeyInput && dom.apiKeyInput.value.trim()) {
+      body.apiKey = dom.apiKeyInput.value.trim();
+    }
+
+    fetch(SERVER_URL + "/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data.status === "ok" && body.apiKey) {
+          dom.apiKeyInput.value = "";
+          dom.apiKeyInput.placeholder = "Key saved";
+          setTimeout(function () {
+            dom.apiKeyInput.placeholder = "sk-ant-... or sk-...";
+          }, 2000);
+        }
+      })
+      .catch(function (err) {
+        console.error("Failed to save settings:", err);
+      });
+  }
+
+  function updateModelOptions() {
+    if (!dom.providerSelect || !dom.modelSelect) return;
+    var provider = dom.providerSelect.value;
+    var select = dom.modelSelect;
+
+    while (select.firstChild) select.removeChild(select.firstChild);
+
+    if (provider === "anthropic") {
+      addOption(select, "claude-sonnet-4-6", "Claude Sonnet 4.6");
+      addOption(select, "claude-haiku-4-5-20251001", "Claude Haiku 4.5");
+      addOption(select, "claude-opus-4-6", "Claude Opus 4.6");
+    } else if (provider === "openai") {
+      addOption(select, "gpt-4o", "GPT-4o");
+      addOption(select, "gpt-4o-mini", "GPT-4o Mini");
+      addOption(select, "gpt-4.1", "GPT-4.1");
+      addOption(select, "gpt-4.1-mini", "GPT-4.1 Mini");
+      addOption(select, "gpt-4.1-nano", "GPT-4.1 Nano");
+    }
+  }
+
+  function addOption(select, value, text) {
+    var option = document.createElement("option");
+    option.value = value;
+    option.textContent = text;
+    select.appendChild(option);
+  }
+
+  // ---------- Chat via HTTP/SSE ----------
 
   function handleSend() {
     var text = dom.chatInput.value.trim();
     if (!text || state.isStreaming) return;
 
-    // Hide empty state
     hideEmptyState();
-
-    // Display user message
     appendMessage("user", text);
 
-    // Send to Max
-    sendToMax("chat", text);
-
-    // Clear input
     dom.chatInput.value = "";
     autoResizeInput();
+    clearCostEstimate();
 
-    // Show typing indicator
     showTypingIndicator();
     state.isStreaming = true;
     updateSendButton();
+
+    sendChatMessage(text);
   }
+
+  function sendChatMessage(text) {
+    state.abortController = new AbortController();
+
+    fetch(SERVER_URL + "/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text }),
+      signal: state.abortController.signal,
+    })
+      .then(function (response) {
+        if (!response.ok) {
+          return response.json().then(function (err) {
+            throw new Error(err.error || "Server error");
+          });
+        }
+        return readSSEStream(response.body.getReader());
+      })
+      .catch(function (err) {
+        if (err.name !== "AbortError") {
+          handleChatError(err.message || "Connection failed");
+        }
+      });
+  }
+
+  function readSSEStream(reader) {
+    var decoder = new TextDecoder();
+    var buffer = "";
+
+    function processBuffer() {
+      var lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      var currentEvent = "";
+      var currentData = "";
+
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        if (line.indexOf("event: ") === 0) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.indexOf("data: ") === 0) {
+          currentData = line.slice(6).trim();
+        } else if (line === "" && currentEvent && currentData) {
+          handleSSEEvent(currentEvent, currentData);
+          currentEvent = "";
+          currentData = "";
+        }
+      }
+    }
+
+    function read() {
+      return reader.read().then(function (result) {
+        if (result.done) {
+          if (buffer) processBuffer();
+          handleStreamDone();
+          return;
+        }
+        buffer += decoder.decode(result.value, { stream: true });
+        processBuffer();
+        return read();
+      });
+    }
+
+    return read();
+  }
+
+  function handleSSEEvent(event, dataStr) {
+    var data;
+    try {
+      data = JSON.parse(dataStr);
+    } catch (e) {
+      return;
+    }
+
+    switch (event) {
+      case "text":
+        handleStreamChunk(data.text || "");
+        break;
+      case "tool_use":
+        appendActionMessage("executing", data.name, data.input);
+        break;
+      case "action_result":
+        appendActionMessage("result", data.tool, data.result);
+        break;
+      case "token_usage":
+        updateTokenUsage(data.input, data.output, data.cost);
+        break;
+      case "error":
+        handleChatError(data.message || "Unknown error");
+        break;
+      case "done":
+        handleStreamDone();
+        break;
+    }
+  }
+
+  // ---------- Action History Display ----------
+
+  function appendActionMessage(type, toolName, data) {
+    var messageEl = document.createElement("div");
+    messageEl.className = "message action";
+
+    var roleLabel = document.createElement("div");
+    roleLabel.className = "message-role";
+    roleLabel.textContent = "Action";
+
+    var contentEl = document.createElement("div");
+    contentEl.className = "message-content action-content";
+
+    var toolLabel = formatToolName(toolName);
+
+    if (type === "executing") {
+      // Build action message using safe DOM methods
+      var iconSpan = document.createElement("span");
+      iconSpan.className = "action-icon";
+      iconSpan.textContent = ">";
+      contentEl.appendChild(iconSpan);
+
+      var boldEl = document.createElement("strong");
+      boldEl.textContent = " Executing: ";
+      contentEl.appendChild(boldEl);
+      contentEl.appendChild(document.createTextNode(toolLabel));
+
+      if (data && Object.keys(data).length > 0) {
+        var pre = document.createElement("pre");
+        pre.className = "action-params";
+        var code = document.createElement("code");
+        code.textContent = JSON.stringify(data, null, 2);
+        pre.appendChild(code);
+        contentEl.appendChild(pre);
+      }
+    } else {
+      var resultIcon = document.createElement("span");
+
+      if (data && data.error) {
+        resultIcon.className = "action-icon action-error";
+        resultIcon.textContent = "x";
+        contentEl.appendChild(resultIcon);
+
+        var boldLabel = document.createElement("strong");
+        boldLabel.textContent = " " + toolLabel + ": ";
+        contentEl.appendChild(boldLabel);
+        contentEl.appendChild(document.createTextNode(data.error));
+      } else {
+        resultIcon.className = "action-icon action-success";
+        resultIcon.textContent = "ok";
+        contentEl.appendChild(resultIcon);
+
+        var boldLabel2 = document.createElement("strong");
+        boldLabel2.textContent = " " + toolLabel + ": ";
+        contentEl.appendChild(boldLabel2);
+        contentEl.appendChild(document.createTextNode(formatActionResult(toolName, data)));
+      }
+    }
+
+    messageEl.appendChild(roleLabel);
+    messageEl.appendChild(contentEl);
+    dom.chatArea.appendChild(messageEl);
+    scrollToBottom();
+  }
+
+  function formatToolName(name) {
+    return (name || "").replace(/_/g, " ").replace(/\b\w/g, function (c) {
+      return c.toUpperCase();
+    });
+  }
+
+  function formatActionResult(toolName, result) {
+    if (!result) return "Done";
+    if (result.status === "ok") {
+      if (result.name) return "'" + result.name + "'" + (result.track_index !== undefined ? " at index " + result.track_index : "");
+      if (result.action) return result.action.replace(/_/g, " ") + " completed";
+      return "Success";
+    }
+    return JSON.stringify(result);
+  }
+
+  // ---------- Message Handling ----------
 
   function appendMessage(role, content) {
     var messageEl = document.createElement("div");
@@ -194,7 +422,7 @@
     if (role === "user") {
       roleLabel.textContent = "You";
     } else if (role === "assistant") {
-      roleLabel.textContent = "Claude";
+      roleLabel.textContent = "AI";
     } else if (role === "error") {
       roleLabel.textContent = "Error";
     } else {
@@ -205,15 +433,13 @@
     contentEl.className = "message-content";
 
     if (role === "user") {
-      // User messages are plain text — no HTML interpretation
+      // User messages: plain text only — no HTML
       contentEl.textContent = content;
     } else {
-      // AI / system / error messages get markdown rendering.
-      // Content originates from our own backend (Claude API responses
-      // routed through node.script) or from system strings defined in
-      // this file. It does not contain arbitrary third-party HTML.
-      // All text is escaped via escapeHtml() before inline markdown
-      // tokens are converted, so script injection is not possible.
+      // AI/system/error messages: markdown rendering.
+      // Content originates from our own backend (AI API responses).
+      // All text is escaped via escapeHtml() inside renderInline
+      // before inline markdown tokens are converted to HTML.
       contentEl.innerHTML = renderMarkdown(content);
     }
 
@@ -231,17 +457,13 @@
     hideTypingIndicator();
 
     if (!state.currentStreamEl) {
-      // Create a new assistant message for this stream
       state.currentStreamEl = appendMessage("assistant", "");
       state.currentStreamText = "";
     }
 
     state.currentStreamText += text;
 
-    // Re-render the full markdown content.
-    // The text comes from our Claude API backend via Max messages.
-    // escapeHtml() is applied inside renderMarkdown/renderInline
-    // before any inline tokens are processed.
+    // Re-render markdown. Text from our AI backend, escaped in renderInline.
     var contentEl = state.currentStreamEl.querySelector(".message-content");
     contentEl.innerHTML = renderMarkdown(state.currentStreamText);
     scrollToBottom();
@@ -251,6 +473,7 @@
     state.isStreaming = false;
     state.currentStreamEl = null;
     state.currentStreamText = "";
+    state.abortController = null;
     hideTypingIndicator();
     updateSendButton();
   }
@@ -259,10 +482,42 @@
     state.isStreaming = false;
     state.currentStreamEl = null;
     state.currentStreamText = "";
+    state.abortController = null;
     hideTypingIndicator();
     updateSendButton();
 
     appendMessage("error", errorMsg || "An unexpected error occurred.");
+  }
+
+  // ---------- Cost Estimate ----------
+
+  function debouncedCostEstimate() {
+    if (state.costEstimateTimer) clearTimeout(state.costEstimateTimer);
+    state.costEstimateTimer = setTimeout(fetchCostEstimate, 500);
+  }
+
+  function fetchCostEstimate() {
+    var text = dom.chatInput.value.trim();
+    if (!text || !dom.costEstimate) return;
+
+    fetch(SERVER_URL + "/api/cost-estimate")
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (dom.costEstimate) {
+          var tokens = formatTokenCount(data.estimatedInputTokens || 0);
+          var cost = "$" + (data.estimatedCost || 0).toFixed(4);
+          dom.costEstimate.textContent = "~" + tokens + " tokens / ~" + cost;
+          dom.costEstimate.style.display = "";
+        }
+      })
+      .catch(function () {});
+  }
+
+  function clearCostEstimate() {
+    if (dom.costEstimate) {
+      dom.costEstimate.textContent = "";
+      dom.costEstimate.style.display = "none";
+    }
   }
 
   // ---------- Token Usage ----------
@@ -277,11 +532,10 @@
       costStr = " / $" + parseFloat(cost).toFixed(4);
     }
 
+    dom.tokenUsage.textContent = "";
     var span = document.createElement("span");
     span.className = "cost";
     span.textContent = formatTokenCount(totalTokens) + " tokens" + costStr;
-
-    dom.tokenUsage.textContent = "";
     dom.tokenUsage.appendChild(span);
   }
 
@@ -314,27 +568,9 @@
     dom.settingsBtn.classList.toggle("active", state.settingsVisible);
   }
 
-  function showSettings() {
-    state.settingsVisible = true;
-    dom.settingsPanel.classList.add("visible");
-    dom.settingsBtn.classList.add("active");
-  }
-
-  function hideSettings() {
-    state.settingsVisible = false;
-    dom.settingsPanel.classList.remove("visible");
-    dom.settingsBtn.classList.remove("active");
-  }
-
-  function setApiKey(key) {
-    if (!key) return;
-    sendToMax("set_api_key", key);
-  }
-
   // ---------- Clear History ----------
 
   function clearHistory() {
-    // Remove all message elements from the chat area
     var messages = dom.chatArea.querySelectorAll(".message");
     messages.forEach(function (msg) {
       msg.remove();
@@ -345,8 +581,7 @@
     state.currentStreamText = "";
     showEmptyState();
 
-    // Notify Max
-    sendToMax("clear_history");
+    fetch(SERVER_URL + "/api/clear", { method: "POST" }).catch(function () {});
   }
 
   // ---------- Tabs ----------
@@ -361,6 +596,103 @@
     dom.tabContents.forEach(function (panel) {
       panel.classList.toggle("active", panel.dataset.tab === tabName);
     });
+  }
+
+  // ---------- Browse Tab ----------
+
+  function handleBrowseSearch() {
+    var query = dom.browseInput ? dom.browseInput.value.trim() : "";
+    var category = dom.browseCategorySelect ? dom.browseCategorySelect.value : "all";
+
+    if (!query) {
+      if (dom.browseResults) {
+        while (dom.browseResults.firstChild) dom.browseResults.removeChild(dom.browseResults.firstChild);
+      }
+      return;
+    }
+
+    fetch(
+      SERVER_URL +
+        "/api/library/search?q=" +
+        encodeURIComponent(query) +
+        "&category=" +
+        encodeURIComponent(category)
+    )
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        renderBrowseResults(data.results || []);
+      })
+      .catch(function () {
+        if (dom.browseResults) {
+          while (dom.browseResults.firstChild) dom.browseResults.removeChild(dom.browseResults.firstChild);
+          var emptyDiv = document.createElement("div");
+          emptyDiv.className = "browse-empty";
+          emptyDiv.textContent = "Server not available";
+          dom.browseResults.appendChild(emptyDiv);
+        }
+      });
+  }
+
+  function renderBrowseResults(results) {
+    if (!dom.browseResults) return;
+
+    while (dom.browseResults.firstChild) dom.browseResults.removeChild(dom.browseResults.firstChild);
+
+    if (results.length === 0) {
+      var emptyDiv = document.createElement("div");
+      emptyDiv.className = "browse-empty";
+      emptyDiv.textContent = "No results found";
+      dom.browseResults.appendChild(emptyDiv);
+      return;
+    }
+
+    for (var i = 0; i < results.length; i++) {
+      var item = results[i];
+
+      var card = document.createElement("div");
+      card.className = "browse-card";
+
+      var nameDiv = document.createElement("div");
+      nameDiv.className = "browse-card-name";
+      nameDiv.textContent = item.name;
+      card.appendChild(nameDiv);
+
+      var catDiv = document.createElement("div");
+      catDiv.className = "browse-card-category";
+      catDiv.textContent = item.category;
+      card.appendChild(catDiv);
+
+      if (item.tags && item.tags.length > 0) {
+        var tagsDiv = document.createElement("div");
+        tagsDiv.className = "browse-card-tags";
+        tagsDiv.textContent = item.tags.slice(0, 4).join(", ");
+        card.appendChild(tagsDiv);
+      }
+
+      var loadBtn = document.createElement("button");
+      loadBtn.className = "browse-load-btn";
+      loadBtn.textContent = "Load";
+      loadBtn.dataset.name = item.name;
+      loadBtn.addEventListener("click", (function (name) {
+        return function () {
+          switchTab("chat");
+          dom.chatInput.value = "Load " + name + " onto a new track";
+          handleSend();
+        };
+      })(item.name));
+      card.appendChild(loadBtn);
+
+      dom.browseResults.appendChild(card);
+    }
+  }
+
+  // ---------- Analyze Tab ----------
+
+  function handleAnalyzeSession() {
+    switchTab("chat");
+    dom.chatInput.value =
+      "Analyze my current session. Get the session state and give me a detailed overview of the tracks, devices, and any suggestions for improvement.";
+    handleSend();
   }
 
   // ---------- Empty State ----------
@@ -396,13 +728,18 @@
     dom.sendBtn.disabled = state.isStreaming;
   }
 
+  function debounce(fn, delay) {
+    var timer;
+    return function () {
+      clearTimeout(timer);
+      timer = setTimeout(fn, delay);
+    };
+  }
+
   // ---------- Markdown Renderer ----------
 
   /**
    * Lightweight markdown-to-HTML renderer.
-   * Handles: code blocks, inline code, bold, italic, headings,
-   * ordered/unordered lists, links, blockquotes, and horizontal rules.
-   *
    * All raw text is escaped via escapeHtml() before inline tokens
    * (bold, italic, links, etc.) are converted to HTML elements.
    * This prevents any script injection from the source text.
@@ -421,26 +758,17 @@
     for (var i = 0; i < lines.length; i++) {
       var line = lines[i];
 
-      // Code block toggle
       if (line.trim().indexOf("```") === 0) {
         if (!inCodeBlock) {
-          // Close any open list
-          if (inList) {
-            html += "</" + listType + ">";
-            inList = false;
-          }
+          if (inList) { html += "</" + listType + ">"; inList = false; }
           inCodeBlock = true;
           codeBlockLang = line.trim().slice(3).trim();
           codeBlockContent = "";
         } else {
-          // End code block
           var langTag = codeBlockLang
             ? '<span class="code-lang">' + escapeHtml(codeBlockLang) + "</span>"
             : "";
-          html +=
-            "<pre>" +
-            langTag +
-            "<code>" +
+          html += "<pre>" + langTag + "<code>" +
             escapeHtml(codeBlockContent.replace(/\n$/, "")) +
             "</code></pre>";
           inCodeBlock = false;
@@ -449,107 +777,65 @@
         continue;
       }
 
-      if (inCodeBlock) {
-        codeBlockContent += line + "\n";
-        continue;
-      }
+      if (inCodeBlock) { codeBlockContent += line + "\n"; continue; }
 
-      // Horizontal rule
       if (/^---+$/.test(line.trim()) || /^\*\*\*+$/.test(line.trim())) {
-        if (inList) {
-          html += "</" + listType + ">";
-          inList = false;
-        }
+        if (inList) { html += "</" + listType + ">"; inList = false; }
         html += "<hr>";
         continue;
       }
 
-      // Headings
       var headingMatch = line.match(/^(#{1,4})\s+(.+)/);
       if (headingMatch) {
-        if (inList) {
-          html += "</" + listType + ">";
-          inList = false;
-        }
+        if (inList) { html += "</" + listType + ">"; inList = false; }
         var level = headingMatch[1].length;
-        html +=
-          "<h" + level + ">" + renderInline(headingMatch[2]) + "</h" + level + ">";
+        html += "<h" + level + ">" + renderInline(headingMatch[2]) + "</h" + level + ">";
         continue;
       }
 
-      // Blockquote
       if (line.trim().indexOf("> ") === 0) {
-        if (inList) {
-          html += "</" + listType + ">";
-          inList = false;
-        }
+        if (inList) { html += "</" + listType + ">"; inList = false; }
         html += "<blockquote>" + renderInline(line.trim().slice(2)) + "</blockquote>";
         continue;
       }
 
-      // Unordered list
       var ulMatch = line.match(/^(\s*)[*\-+]\s+(.+)/);
       if (ulMatch) {
         if (!inList || listType !== "ul") {
           if (inList) html += "</" + listType + ">";
-          html += "<ul>";
-          inList = true;
-          listType = "ul";
+          html += "<ul>"; inList = true; listType = "ul";
         }
         html += "<li>" + renderInline(ulMatch[2]) + "</li>";
         continue;
       }
 
-      // Ordered list
       var olMatch = line.match(/^(\s*)\d+\.\s+(.+)/);
       if (olMatch) {
         if (!inList || listType !== "ol") {
           if (inList) html += "</" + listType + ">";
-          html += "<ol>";
-          inList = true;
-          listType = "ol";
+          html += "<ol>"; inList = true; listType = "ol";
         }
         html += "<li>" + renderInline(olMatch[2]) + "</li>";
         continue;
       }
 
-      // Close list if we hit a non-list line
-      if (inList && line.trim() === "") {
-        html += "</" + listType + ">";
-        inList = false;
-        continue;
-      }
+      if (inList && line.trim() === "") { html += "</" + listType + ">"; inList = false; continue; }
+      if (inList && !ulMatch && !olMatch) { html += "</" + listType + ">"; inList = false; }
+      if (line.trim() === "") continue;
 
-      if (inList && !ulMatch && !olMatch) {
-        html += "</" + listType + ">";
-        inList = false;
-      }
-
-      // Empty line
-      if (line.trim() === "") {
-        continue;
-      }
-
-      // Regular paragraph
       html += "<p>" + renderInline(line) + "</p>";
     }
 
-    // Close any open blocks
     if (inCodeBlock) {
       var langTag2 = codeBlockLang
         ? '<span class="code-lang">' + escapeHtml(codeBlockLang) + "</span>"
         : "";
-      html +=
-        "<pre>" +
-        langTag2 +
-        "<code>" +
+      html += "<pre>" + langTag2 + "<code>" +
         escapeHtml(codeBlockContent.replace(/\n$/, "")) +
         "</code></pre>";
     }
 
-    if (inList) {
-      html += "</" + listType + ">";
-    }
+    if (inList) html += "</" + listType + ">";
 
     return html;
   }
@@ -559,50 +845,23 @@
    * Text is escaped before token conversion to prevent injection.
    */
   function renderInline(text) {
-    // Escape HTML first — all raw text is sanitized here
     text = escapeHtml(text);
-
-    // Inline code (must come before bold/italic to protect backtick content)
-    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-    // Bold + italic (***text***)
+    text = text.replace(/`([^`]+)`/g, "<code>$1</code>");
     text = text.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
-
-    // Bold (**text**)
     text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-
-    // Italic (*text*)
     text = text.replace(/\*(.+?)\*/g, "<em>$1</em>");
-
-    // Bold with underscores (__text__)
     text = text.replace(/__(.+?)__/g, "<strong>$1</strong>");
-
-    // Italic with underscores (_text_)
-    text = text.replace(
-      /\b_(.+?)_\b/g,
-      "<em>$1</em>"
-    );
-
-    // Links [text](url)
+    text = text.replace(/\b_(.+?)_\b/g, "<em>$1</em>");
     text = text.replace(
       /\[([^\]]+)\]\(([^)]+)\)/g,
       '<a href="$2" target="_blank" rel="noopener">$1</a>'
     );
-
     return text;
   }
 
   function escapeHtml(text) {
-    var map = {
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#039;",
-    };
-    return text.replace(/[&<>"']/g, function (c) {
-      return map[c];
-    });
+    var map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
+    return text.replace(/[&<>"']/g, function (c) { return map[c]; });
   }
 
   // ---------- Boot ----------
