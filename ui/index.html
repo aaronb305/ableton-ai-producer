@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ableton AI Producer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <span class="header-title">AI Producer</span>
+      </div>
+      <div class="header-right">
+        <div id="token-usage" class="token-usage">
+          <span class="cost">0 tokens</span>
+        </div>
+        <button id="settings-btn" class="settings-btn" title="Settings">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Settings Panel (hidden by default) -->
+    <div id="settings-panel" class="settings-panel">
+      <div class="settings-group">
+        <label class="settings-label" for="api-key-input">API Key</label>
+        <input
+          id="api-key-input"
+          class="settings-input"
+          type="password"
+          placeholder="sk-ant-..."
+          autocomplete="off"
+          spellcheck="false"
+        >
+      </div>
+      <div class="settings-row">
+        <div class="settings-group">
+          <label class="settings-label" for="model-select">Model</label>
+          <select id="model-select" class="settings-select">
+            <option value="sonnet" selected>Claude Sonnet</option>
+            <option value="haiku">Claude Haiku</option>
+            <option value="opus">Claude Opus</option>
+          </select>
+        </div>
+        <div class="settings-group">
+          <label class="settings-label" for="context-select">Context Depth</label>
+          <select id="context-select" class="settings-select">
+            <option value="minimal">Minimal</option>
+            <option value="standard" selected>Standard</option>
+            <option value="detailed">Detailed</option>
+            <option value="full">Full</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-actions">
+        <button id="clear-btn" class="btn btn-danger">Clear History</button>
+      </div>
+    </div>
+
+    <!-- Tab Bar -->
+    <nav class="tab-bar">
+      <button class="tab active" data-tab="chat">Chat</button>
+      <button class="tab disabled" data-tab="analyze">Analyze</button>
+      <button class="tab disabled" data-tab="browse">Browse</button>
+    </nav>
+
+    <!-- Tab: Chat -->
+    <div class="tab-content active" data-tab="chat">
+      <div id="chat-area" class="chat-area">
+
+        <!-- Empty state (shown when no messages) -->
+        <div id="empty-state" class="empty-state">
+          <div class="empty-state-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+            </svg>
+          </div>
+          <div class="empty-state-title">AI Production Assistant</div>
+          <div class="empty-state-subtitle">
+            Ask about your session, get mixing advice, find sounds, or let Claude take actions in Ableton.
+          </div>
+        </div>
+
+        <!-- Typing indicator (managed by JS) -->
+        <div id="typing-indicator" class="typing-indicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+
+      </div>
+
+      <!-- Input Area -->
+      <div class="input-area">
+        <div class="input-wrapper">
+          <textarea
+            id="chat-input"
+            placeholder="Ask Claude about your session..."
+            rows="1"
+            spellcheck="true"
+          ></textarea>
+        </div>
+        <button id="send-btn" class="send-btn" title="Send message">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab: Analyze (placeholder) -->
+    <div class="tab-content" data-tab="analyze">
+      <div class="placeholder-panel">
+        <div class="title">Track Analyzer</div>
+        <div class="subtitle">Coming soon. Spectral analysis, key detection, and session diagnostics.</div>
+      </div>
+    </div>
+
+    <!-- Tab: Browse (placeholder) -->
+    <div class="tab-content" data-tab="browse">
+      <div class="placeholder-panel">
+        <div class="title">Sound Library</div>
+        <div class="subtitle">Coming soon. Browse and search Ableton's built-in instruments and presets.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

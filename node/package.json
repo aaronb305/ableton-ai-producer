@@ -1,0 +1,15 @@
+{
+  "name": "ableton-ai-node",
+  "version": "0.1.0",
+  "description": "Node.js backend for Ableton AI Producer M4L device",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
