@@ -6,3 +6,4 @@ node_modules/
 dist/
 .cache/
 library-index.json
+.ableton-ai-state.json

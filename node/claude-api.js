@@ -7,6 +7,11 @@
 
 const { tools } = require("./tools");
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 1000;
+const JITTER_FACTOR = 0.25;
+
 // Lazy-loaded Anthropic SDK reference
 let Anthropic = null;
 
@@ -75,11 +80,20 @@ function buildSystemPrompt(sessionState, sessionSummary) {
     `- When suggesting sounds or presets, prefer Ableton's built-in content first.\n` +
     `- Explain your reasoning when making production suggestions.\n` +
     `- When creating MIDI content, use musically appropriate values (correct scales, rhythms, velocities).\n` +
-    `- Always confirm destructive actions (deleting tracks/clips) before executing.\n` +
     `- If you need current session information, use the get_session_state tool.\n` +
     `- Reference specific tracks by name and index for clarity.\n` +
     `- Use music theory terminology appropriate for the user's apparent skill level.\n` +
     `- When writing MIDI notes, remember: middle C = 60, each semitone = 1, each octave = 12.`
+  );
+
+  parts.push(
+    `\nDestructive action safety:\n` +
+    `Tools marked DESTRUCTIVE (delete_track, delete_clip, remove_device, remove_notes_from_clip) ` +
+    `require a "confirmed" parameter set to true. You MUST:\n` +
+    `1. Tell the user exactly what will be deleted (track name, clip name, device name, etc.).\n` +
+    `2. Wait for the user to explicitly confirm (e.g., "yes", "go ahead", "do it").\n` +
+    `3. Only then call the tool with confirmed: true.\n` +
+    `Never set confirmed: true without explicit user approval in the current conversation.`
   );
 
   if (sessionSummary) {
@@ -113,6 +127,26 @@ function formatSessionState(state) {
 }
 
 /**
+ * Promise-based delay using setTimeout (Node.js v16 compatible).
+ * @param {number} ms - Milliseconds to wait
+ * @returns {Promise<void>}
+ */
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Calculate retry delay with exponential backoff and jitter.
+ * @param {number} attempt - Retry attempt number (1-based)
+ * @returns {number} Delay in milliseconds
+ */
+function getRetryDelay(attempt) {
+  const exponentialDelay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+  const jitter = exponentialDelay * JITTER_FACTOR * (2 * Math.random() - 1);
+  return Math.round(exponentialDelay + jitter);
+}
+
+/**
  * Send a message to Claude with streaming support.
  *
  * @param {object} client - Anthropic client instance
@@ -140,61 +174,77 @@ async function sendMessage(client, messages, options = {}) {
     onError = () => {},
   } = options;
 
-  const toolUses = [];
-  let fullText = "";
-  let stopReason = "";
-  let inputTokens = 0;
-  let outputTokens = 0;
+  let lastError = null;
 
-  try {
-    const stream = client.messages.stream({
-      model,
-      max_tokens: maxTokens,
-      temperature,
-      system: systemPrompt,
-      messages,
-      tools,
-    });
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    // On retry attempts, wait with exponential backoff and notify the user
+    if (attempt > 0) {
+      const retryDelay = getRetryDelay(attempt);
+      onText(`\n\n[Retrying... attempt ${attempt}/${MAX_RETRIES}]\n\n`);
+      await delay(retryDelay);
+    }
 
-    // Handle streamed events
-    stream.on("text", (text) => {
-      fullText += text;
-      onText(text);
-    });
+    const toolUses = [];
+    let fullText = "";
 
-    stream.on("contentBlock", (block) => {
-      if (block.type === "tool_use") {
-        toolUses.push({
-          id: block.id,
-          name: block.name,
-          input: block.input,
-        });
-        onToolUse(block);
+    try {
+      const stream = client.messages.stream({
+        model,
+        max_tokens: maxTokens,
+        temperature,
+        system: systemPrompt,
+        messages,
+        tools,
+      });
+
+      // Handle streamed events
+      stream.on("text", (text) => {
+        fullText += text;
+        onText(text);
+      });
+
+      stream.on("contentBlock", (block) => {
+        if (block.type === "tool_use") {
+          toolUses.push({
+            id: block.id,
+            name: block.name,
+            input: block.input,
+          });
+          onToolUse(block);
+        }
+      });
+
+      // Wait for the stream to complete and get the final message
+      const finalMessage = await stream.finalMessage();
+
+      const stopReason = finalMessage.stop_reason || "";
+      const inputTokens = finalMessage.usage?.input_tokens || 0;
+      const outputTokens = finalMessage.usage?.output_tokens || 0;
+
+      onUsage({ inputTokens, outputTokens });
+
+      return {
+        response: finalMessage,
+        toolUses,
+        stopReason,
+        fullText,
+        usage: { inputTokens, outputTokens },
+      };
+    } catch (err) {
+      const errorInfo = classifyError(err);
+      lastError = errorInfo;
+
+      // Only retry on retryable errors and if we have attempts left
+      if (!errorInfo.retryable || attempt >= MAX_RETRIES) {
+        onError(errorInfo);
+        throw errorInfo;
       }
-    });
-
-    // Wait for the stream to complete and get the final message
-    const finalMessage = await stream.finalMessage();
-
-    stopReason = finalMessage.stop_reason || "";
-    inputTokens = finalMessage.usage?.input_tokens || 0;
-    outputTokens = finalMessage.usage?.output_tokens || 0;
-
-    onUsage({ inputTokens, outputTokens });
-
-    return {
-      response: finalMessage,
-      toolUses,
-      stopReason,
-      fullText,
-      usage: { inputTokens, outputTokens },
-    };
-  } catch (err) {
-    // Classify errors for the caller
-    const errorInfo = classifyError(err);
-    onError(errorInfo);
-    throw errorInfo;
+    }
   }
+
+  // Should not be reachable, but satisfy the linter
+  onError(lastError);
+  throw lastError;
 }
 
 /**

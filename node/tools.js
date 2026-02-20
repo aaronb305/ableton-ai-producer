@@ -65,7 +65,7 @@ const tools = [
   {
     name: "delete_track",
     description:
-      "Delete a track from the session. This is destructive and cannot be undone via the API.",
+      "Delete a track from the session. DESTRUCTIVE: requires confirmed=true after getting explicit user consent.",
     input_schema: {
       type: "object",
       properties: {
@@ -73,8 +73,12 @@ const tools = [
           type: "integer",
           description: "Index of the track to delete (0-based)",
         },
+        confirmed: {
+          type: "boolean",
+          description: "Must be true. Only set after the user explicitly confirms deletion.",
+        },
       },
-      required: ["track_index"],
+      required: ["track_index", "confirmed"],
     },
   },
   {
@@ -241,7 +245,7 @@ const tools = [
   },
   {
     name: "remove_device",
-    description: "Remove a device from a track's device chain.",
+    description: "Remove a device from a track's device chain. DESTRUCTIVE: requires confirmed=true after getting explicit user consent.",
     input_schema: {
       type: "object",
       properties: {
@@ -253,8 +257,12 @@ const tools = [
           type: "integer",
           description: "Index of the device to remove (0-based)",
         },
+        confirmed: {
+          type: "boolean",
+          description: "Must be true. Only set after the user explicitly confirms removal.",
+        },
       },
-      required: ["track_index", "device_index"],
+      required: ["track_index", "device_index", "confirmed"],
     },
   },
 
@@ -340,7 +348,7 @@ const tools = [
   {
     name: "remove_notes_from_clip",
     description:
-      "Remove all MIDI notes from a clip within a specified time and pitch range.",
+      "Remove MIDI notes from a clip within a specified time and pitch range. DESTRUCTIVE: requires confirmed=true after getting explicit user consent.",
     input_schema: {
       type: "object",
       properties: {
@@ -372,8 +380,12 @@ const tools = [
           minimum: 0,
           maximum: 127,
         },
+        confirmed: {
+          type: "boolean",
+          description: "Must be true. Only set after the user explicitly confirms removal.",
+        },
       },
-      required: ["track_index", "clip_index"],
+      required: ["track_index", "clip_index", "confirmed"],
     },
   },
   {
@@ -400,7 +412,7 @@ const tools = [
   },
   {
     name: "delete_clip",
-    description: "Delete a clip from a clip slot.",
+    description: "Delete a clip from a clip slot. DESTRUCTIVE: requires confirmed=true after getting explicit user consent.",
     input_schema: {
       type: "object",
       properties: {
@@ -412,8 +424,12 @@ const tools = [
           type: "integer",
           description: "Index of the clip slot (0-based)",
         },
+        confirmed: {
+          type: "boolean",
+          description: "Must be true. Only set after the user explicitly confirms deletion.",
+        },
       },
-      required: ["track_index", "clip_index"],
+      required: ["track_index", "clip_index", "confirmed"],
     },
   },
   {

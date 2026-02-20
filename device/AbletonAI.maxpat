@@ -302,6 +302,50 @@
 					"patching_rect" : [ 550.0, 280.0, 70.0, 22.0 ],
 					"text" : "delay 3000"
 				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-library-indexer",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 700.0, 300.0, 220.0, 22.0 ],
+					"text" : "js ../patchers/library-indexer.js"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-route-library",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 4,
+					"outlettype" : [ "", "", "", "" ],
+					"patching_rect" : [ 700.0, 340.0, 280.0, 22.0 ],
+					"text" : "route library_index scan_progress scan_error"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-prepend-library-index",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 700.0, 380.0, 140.0, 22.0 ],
+					"text" : "prepend library_index"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-delay-scan",
+					"maxclass" : "newobj",
+					"numinlets" : 2,
+					"numoutlets" : 1,
+					"outlettype" : [ "bang" ],
+					"patching_rect" : [ 700.0, 280.0, 70.0, 22.0 ],
+					"text" : "delay 5000"
+				}
 			}
 		],
 		"lines" : [
@@ -489,6 +533,36 @@
 				"patchline" : 				{
 					"source" : [ "obj-delay-init", 0 ],
 					"destination" : [ "obj-session-reader", 0 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-loadbang", 0 ],
+					"destination" : [ "obj-delay-scan", 0 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-delay-scan", 0 ],
+					"destination" : [ "obj-library-indexer", 0 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-library-indexer", 0 ],
+					"destination" : [ "obj-route-library", 0 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-route-library", 0 ],
+					"destination" : [ "obj-prepend-library-index", 0 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-prepend-library-index", 0 ],
+					"destination" : [ "obj-node", 0 ]
 				}
 			}
 		]

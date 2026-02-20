@@ -12,6 +12,8 @@
 
 const { createClient, sendMessage, buildSystemPrompt } = require("./claude-api");
 const { tools } = require("./tools");
+const library = require("./library");
+const persistence = require("./persistence");
 
 // ---------------------------------------------------------------------------
 // max-api: injected by Max at runtime, gracefully absent during testing
@@ -38,17 +40,25 @@ try {
 // State
 // ---------------------------------------------------------------------------
 
+// Restore persisted settings on startup
+const savedState = persistence.load();
+
 /** @type {object|null} Anthropic client instance */
 let client = null;
 
 /** @type {string} Current model identifier */
-let model = "claude-sonnet-4-6";
+let model = savedState.model;
 
 /** @type {string} Default context depth for session state */
-let contextDepth = "standard";
+let contextDepth = savedState.contextDepth;
 
-/** @type {string|null} Claude API key (held in memory only) */
-let apiKey = null;
+/** @type {string|null} Claude API key */
+let apiKey = savedState.apiKey;
+
+// Destructive tools that require confirmed=true
+const DESTRUCTIVE_TOOLS = new Set([
+  "delete_track", "delete_clip", "remove_device", "remove_notes_from_clip",
+]);
 
 /** @type {object|null} Latest Ableton session state from Max */
 let sessionState = null;
@@ -130,6 +140,7 @@ maxApi.addHandler("set_api_key", (key) => {
   try {
     client = createClient(apiKey);
     log("API key set and client created successfully");
+    persistence.save({ model, contextDepth, apiKey });
     maxApi.outlet("chat_response", "API key configured successfully.");
     maxApi.outlet("chat_done");
   } catch (err) {
@@ -150,6 +161,7 @@ maxApi.addHandler("set_model", (newModel) => {
   }
   model = newModel.trim();
   log(`Model set to: ${model}`);
+  persistence.save({ model, contextDepth, apiKey });
 });
 
 // ---------------------------------------------------------------------------
@@ -163,6 +175,7 @@ maxApi.addHandler("set_depth", (depth) => {
   }
   contextDepth = depth;
   log(`Context depth set to: ${contextDepth}`);
+  persistence.save({ model, contextDepth, apiKey });
 });
 
 // ---------------------------------------------------------------------------
@@ -176,6 +189,19 @@ maxApi.addHandler("session_state", (stateJson) => {
   }
   sessionState = parsed;
   log(`Session state updated (${Object.keys(parsed).length} top-level keys)`);
+});
+
+// ---------------------------------------------------------------------------
+// Handler: library_index (receives browser scan results from library-indexer.js)
+// ---------------------------------------------------------------------------
+maxApi.addHandler("library_index", (indexJson) => {
+  const parsed = safeParse(indexJson);
+  if (!parsed || !Array.isArray(parsed)) {
+    logError("Failed to parse library index JSON");
+    return;
+  }
+  library.updateIndex(parsed);
+  log(`Library index updated with ${parsed.length} scanned items`);
 });
 
 // ---------------------------------------------------------------------------
@@ -348,9 +374,25 @@ async function runConversationLoop(systemPrompt) {
 
       let toolResult;
 
-      // Special case: get_session_state is handled locally
+      // Gate destructive tools — require confirmed=true
+      if (DESTRUCTIVE_TOOLS.has(toolUse.name) && !toolUse.input?.confirmed) {
+        toolResult = {
+          type: "tool_result",
+          tool_use_id: toolUse.id,
+          content: JSON.stringify({
+            error: "Destructive action blocked: you must ask the user for confirmation first, then call this tool again with confirmed: true.",
+          }),
+          is_error: true,
+        };
+        toolResults.push(toolResult);
+        continue;
+      }
+
+      // Handle tools that can be resolved locally (no Max round-trip)
       if (toolUse.name === "get_session_state") {
         toolResult = await handleGetSessionState(toolUse);
+      } else if (toolUse.name === "search_library") {
+        toolResult = handleSearchLibrary(toolUse);
       } else {
         // Emit action request to Max and wait for result
         toolResult = await requestAction(toolUse);
@@ -400,6 +442,33 @@ async function handleGetSessionState(toolUse) {
   // Request fresh state from Max
   maxApi.outlet("action_request", "get_session_state", JSON.stringify(toolUse.input || {}));
   return waitForActionResult(toolUse.id);
+}
+
+/**
+ * Handle the search_library tool call locally using the built-in index.
+ *
+ * @param {object} toolUse - The tool_use block from Claude
+ * @returns {object} Tool result message
+ */
+function handleSearchLibrary(toolUse) {
+  const query = toolUse.input?.query || "";
+  const category = toolUse.input?.category || "all";
+  const results = library.search(query, category);
+
+  return {
+    type: "tool_result",
+    tool_use_id: toolUse.id,
+    content: JSON.stringify({
+      status: "ok",
+      query,
+      category,
+      results_count: results.length,
+      results,
+      note: results.length === 0
+        ? "No matches found. Try broader terms or a different category."
+        : "Use load_instrument or load_effect with the item name to load onto a track.",
+    }),
+  };
 }
 
 /**
@@ -547,6 +616,19 @@ function waitForActionResult(toolUseId, timeoutMs = 30000) {
 // ---------------------------------------------------------------------------
 // Initialization
 // ---------------------------------------------------------------------------
+
+// Restore API client from saved key if available
+if (apiKey) {
+  try {
+    client = createClient(apiKey);
+    log("Restored API client from saved settings");
+  } catch (err) {
+    logError(`Failed to restore API client: ${err.message}`);
+    apiKey = null;
+    client = null;
+  }
+}
+
 log("Ableton AI backend loaded and ready");
 log(`Default model: ${model}`);
 log(`Tools available: ${tools.length}`);
