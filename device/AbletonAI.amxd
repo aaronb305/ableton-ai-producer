@@ -9,6 +9,7 @@
 			"modernui" : 1
 		},
 		"classnamespace" : "box",
+		"device_type" : "audio_effect",
 		"rect" : [ 0, 0, 1100, 800 ],
 		"bglocked" : 0,
 		"openinpresentation" : 1,
@@ -38,6 +39,27 @@
 		"subpatcher_template" : "",
 		"assistshowspatchername" : 0,
 		"boxes" : [
+			{
+				"box" : 				{
+					"id" : "obj-thisdevice",
+					"maxclass" : "newobj",
+					"numinlets" : 1,
+					"numoutlets" : 1,
+					"outlettype" : [ "" ],
+					"patching_rect" : [ 700.0, 30.0, 120.0, 22.0 ],
+					"text" : "live.thisdevice"
+				}
+			},
+			{
+				"box" : 				{
+					"id" : "obj-plugout",
+					"maxclass" : "newobj",
+					"numinlets" : 2,
+					"numoutlets" : 0,
+					"patching_rect" : [ 30.0, 800.0, 80.0, 22.0 ],
+					"text" : "plugout~ 2"
+				}
+			},
 			{
 				"box" : 				{
 					"id" : "obj-node",
@@ -348,6 +370,18 @@
 			}
 		],
 		"lines" : [
+			{
+				"patchline" : 				{
+					"source" : [ "obj-plugin", 0 ],
+					"destination" : [ "obj-plugout", 0 ]
+				}
+			},
+			{
+				"patchline" : 				{
+					"source" : [ "obj-plugin", 1 ],
+					"destination" : [ "obj-plugout", 1 ]
+				}
+			},
 			{
 				"patchline" : 				{
 					"source" : [ "obj-node", 0 ],
