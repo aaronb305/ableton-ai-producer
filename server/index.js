@@ -510,8 +510,8 @@ app.post("/api/clear", (_req, res) => {
 // Start server
 // ---------------------------------------------------------------------------
 
-app.listen(PORT, () => {
-  console.log(`[ableton-ai-server] Running on http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`[ableton-ai-server] Running on http://127.0.0.1:${PORT}`);
   console.log(
     `[ableton-ai-server] Provider: ${aiProvider.getActiveProviderName()}, Model: ${currentModel}`
   );

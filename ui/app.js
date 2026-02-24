@@ -15,7 +15,7 @@
 (function () {
   "use strict";
 
-  var SERVER_URL = "http://localhost:9320";
+  var SERVER_URL = "http://127.0.0.1:9320";
 
   // ---------- State ----------
 
@@ -155,7 +155,10 @@
         if (data.model) dom.modelSelect.value = data.model;
         if (data.contextDepth) dom.contextSelect.value = data.contextDepth;
       })
-      .catch(function () {});
+      .catch(function () {
+        // Server not ready yet — retry in 2s
+        setTimeout(loadSettings, 2000);
+      });
   }
 
   function saveSettings() {

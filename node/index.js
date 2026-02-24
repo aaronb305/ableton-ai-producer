@@ -40,7 +40,7 @@ try {
 const SERVER_DIR = path.join(__dirname, "..", "server");
 const SERVER_SCRIPT = path.join(SERVER_DIR, "index.js");
 const SERVER_PORT = 9320;
-const SERVER_URL = `http://localhost:${SERVER_PORT}`;
+const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
 const HEALTH_CHECK_INTERVAL = 500;
 const HEALTH_CHECK_TIMEOUT = 15000;
 
@@ -118,15 +118,40 @@ function httpRequest(method, urlPath, body) {
 // Server lifecycle
 // ---------------------------------------------------------------------------
 
+/**
+ * Find a Node.js 18+ binary. Max's bundled node is v16 and can't run the server.
+ * Try common install locations before falling back to PATH.
+ */
+function findNodeBinary() {
+  const fs = require("fs");
+  const candidates = [
+    "/usr/local/bin/node",       // macOS Intel (Homebrew / installer)
+    "/opt/homebrew/bin/node",    // macOS Apple Silicon (Homebrew)
+    "/usr/bin/node",             // Linux system node
+    "node",                      // fallback to PATH
+  ];
+  for (const candidate of candidates) {
+    if (candidate === "node") return candidate; // PATH fallback always "exists"
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return candidate;
+    } catch {
+      // not found, try next
+    }
+  }
+  return "node";
+}
+
 function startServer() {
   if (serverProcess) {
     log("Server already running");
     return;
   }
 
-  log("Starting backend server...");
+  const nodeBin = findNodeBinary();
+  log(`Starting backend server... (node: ${nodeBin})`);
 
-  serverProcess = spawn("node", [SERVER_SCRIPT], {
+  serverProcess = spawn(nodeBin, [SERVER_SCRIPT], {
     cwd: SERVER_DIR,
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, PORT: String(SERVER_PORT) },
@@ -157,7 +182,7 @@ function startServer() {
       log("Server is healthy, connecting action stream...");
       connectActionStream();
       // Tell Max to load the UI in jweb (served from Express)
-      maxApi.outlet("jweb_url", `http://localhost:${SERVER_PORT}`);
+      maxApi.outlet("jweb_url", `http://127.0.0.1:${SERVER_PORT}`);
     })
     .catch((err) => {
       logError(`Server health check failed: ${err.message}`);
