@@ -53,7 +53,7 @@ jweb (Chat UI) ── HTTP/SSE ──> Backend Server (Express, port 9320)
 ### Install
 
 ```bash
-git clone https://github.com/your-username/ableton-ai.git
+git clone https://github.com/aaronb305/ableton-ai-producer.git
 cd ableton-ai
 
 # Install backend server dependencies
