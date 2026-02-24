@@ -10,6 +10,7 @@
  *   node.script → HTTP → this server (action results, session state)
  */
 
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const { streamText } = require("ai");
@@ -27,6 +28,9 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
+// Serve the UI files (jweb loads from here to avoid M4L path issues)
+app.use(express.static(path.join(__dirname, "..", "ui")));
+
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -41,6 +45,8 @@ if (savedState.apiKeys) {
     if (key) aiProvider.configureProvider(provider, key);
   }
 }
+// Ollama is always available (local, no API key needed)
+aiProvider.configureProvider("ollama");
 aiProvider.setActiveProvider(savedState.provider || "anthropic");
 
 // SSE clients waiting for action requests (node.script connects here)

@@ -156,6 +156,8 @@ function startServer() {
     .then(() => {
       log("Server is healthy, connecting action stream...");
       connectActionStream();
+      // Tell Max to load the UI in jweb (served from Express)
+      maxApi.outlet("jweb_url", `http://localhost:${SERVER_PORT}`);
     })
     .catch((err) => {
       logError(`Server health check failed: ${err.message}`);

@@ -204,6 +204,21 @@
       addOption(select, "gpt-4.1", "GPT-4.1");
       addOption(select, "gpt-4.1-mini", "GPT-4.1 Mini");
       addOption(select, "gpt-4.1-nano", "GPT-4.1 Nano");
+    } else if (provider === "ollama") {
+      addOption(select, "qwen2.5-coder:7b", "Qwen 2.5 Coder 7B");
+      addOption(select, "llama3.1:8b", "Llama 3.1 8B");
+      addOption(select, "mistral:7b", "Mistral 7B");
+      addOption(select, "deepseek-r1:8b", "DeepSeek R1 8B");
+      addOption(select, "gemma3:12b", "Gemma 3 12B");
+    }
+
+    // Update API key placeholder based on provider
+    if (dom.apiKeyInput) {
+      if (provider === "ollama") {
+        dom.apiKeyInput.placeholder = "No key needed (or custom URL)";
+      } else {
+        dom.apiKeyInput.placeholder = "sk-ant-... or sk-...";
+      }
     }
   }
 

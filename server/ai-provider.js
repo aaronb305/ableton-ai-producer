@@ -18,6 +18,7 @@ let activeProviderName = "anthropic";
 const DEFAULT_MODELS = {
   anthropic: "claude-sonnet-4-6",
   openai: "gpt-4o",
+  ollama: "qwen2.5-coder:7b",
 };
 
 // Cost rates per 1M tokens
@@ -44,6 +45,12 @@ function configureProvider(name, apiKey) {
     providers.anthropic = createAnthropic({ apiKey });
   } else if (name === "openai") {
     providers.openai = createOpenAI({ apiKey });
+  } else if (name === "ollama") {
+    // Ollama uses OpenAI-compatible API, apiKey is ignored but required by SDK
+    providers.ollama = createOpenAI({
+      baseURL: apiKey || "http://localhost:11434/v1",
+      apiKey: "ollama",
+    });
   }
 }
 
@@ -52,7 +59,7 @@ function configureProvider(name, apiKey) {
  * @param {string} name - Provider name
  */
 function setActiveProvider(name) {
-  if (name === "anthropic" || name === "openai") {
+  if (name === "anthropic" || name === "openai" || name === "ollama") {
     activeProviderName = name;
   }
 }
