@@ -145,6 +145,7 @@
   // ---------- Settings via HTTP ----------
 
   function loadSettings() {
+    setConnectionStatus("connecting");
     fetch(SERVER_URL + "/api/settings")
       .then(function (res) { return res.json(); })
       .then(function (data) {
@@ -154,11 +155,24 @@
         }
         if (data.model) dom.modelSelect.value = data.model;
         if (data.contextDepth) dom.contextSelect.value = data.contextDepth;
+        setConnectionStatus("connected");
       })
       .catch(function () {
-        // Server not ready yet — retry in 2s
+        setConnectionStatus("waiting");
         setTimeout(loadSettings, 2000);
       });
+  }
+
+  function setConnectionStatus(status) {
+    var subtitle = document.querySelector(".empty-state-subtitle");
+    if (!subtitle) return;
+    if (status === "connecting") {
+      subtitle.textContent = "Connecting to AI server...";
+    } else if (status === "waiting") {
+      subtitle.textContent = "Waiting for server to start...";
+    } else {
+      subtitle.textContent = "Ask about your session, get mixing advice, find sounds, or let the AI take actions in Ableton.";
+    }
   }
 
   function saveSettings() {
